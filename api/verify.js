@@ -1,6 +1,5 @@
 // api/verify.js
-// Vercel Serverless Function
-// SECURE: Keys are loaded from Vercel Environment Variables
+// Vercel Serverless Function (Super Stealth Mode)
 
 export default async function handler(request, response) {
   // 1. CORS HEADERS
@@ -14,25 +13,17 @@ export default async function handler(request, response) {
     return;
   }
 
-  // 2. LOAD SECRETS FROM ENVIRONMENT (Safe!)
   const API_KEY = process.env.PAYVESSEL_API_KEY;
   const SECRET_KEY = process.env.PAYVESSEL_SECRET_KEY;
   const BUSINESS_ID = process.env.PAYVESSEL_BUSINESS_ID; 
   const BRIDGE_SECRET = process.env.BRIDGE_SECRET; 
 
-  // Check if keys are loaded
-  if (!API_KEY || !SECRET_KEY) {
-    return response.status(500).json({ status: false, message: "Server Misconfiguration: Missing Keys" });
-  }
-
-  // 3. GET REFERENCE ID
   const { ref } = request.query;
 
   if (!ref) {
     return response.status(400).json({ status: false, message: "Missing Reference ID" });
   }
 
-  // 4. CALL PAYVESSEL
   const url = `https://api.payvessel.com/api/v2/transactions/${ref}`;
 
   try {
@@ -43,11 +34,23 @@ export default async function handler(request, response) {
         'secret-key': SECRET_KEY,
         'business-id': BUSINESS_ID,
         'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36'
+        // STEALTH HEADERS: Mimic a real Chrome browser on Windows
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Cache-Control': 'max-age=0'
       }
     });
 
     if (!apiRes.ok) {
+       // Pass the specific error back so we can see it
        return response.status(apiRes.status).json({ status: false, message: `Bank Error: ${apiRes.status}` });
     }
 
@@ -63,12 +66,10 @@ export default async function handler(request, response) {
        return response.status(400).json({ status: false, message: "Transaction was not successful" });
     }
 
-    // 5. GENERATE SECURITY HASH
     const crypto = require('crypto');
     const rawString = data.reference + data.amount + BRIDGE_SECRET;
     const signature = crypto.createHash('sha256').update(rawString).digest('hex');
 
-    // 6. RETURN SUCCESS
     return response.status(200).json({
       status: true,
       data: [{
